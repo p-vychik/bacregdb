@@ -172,20 +172,27 @@ def retrieve_sites_attributes(columns, check_tag, protein_dict, genome_record, s
 def get_crtag(alignment, crtag_coordinates, protein_seq, left_dels=0, right_dels=0):
     if "|" in crtag_coordinates:
         # process cr-tag consisting from two parts due to large distance between coordinate blocks
-        parts = [list(map(int, part.split(','))) for part in crtag_coordinates.split("|")]
+        parts = [[int(x) for x in part.split(",")] for part in crtag_coordinates.split("|")]
     else:
-        parts = [list(map(int, crtag_coordinates.split(',')))]
+        parts = [[int(x) for x in crtag_coordinates.split(',')]]
     dels_free_alignment = alignment.replace('.', '')
     # check sequence for internal deletions (gaps)
     # dels_coordinates = []
     if '-' in dels_free_alignment:
-        # dels_coordinates = [index for index, char in enumerate(dels_free_alignment) if char == '-']
         no_internal_dels_alignment = dels_free_alignment.replace('-', '')
         substr_start = protein_seq.find(no_internal_dels_alignment.upper())
     else:
         substr_start = protein_seq.find(dels_free_alignment.upper())
     # extend left part
-    extended_alignment = protein_seq[substr_start - left_dels:substr_start] + dels_free_alignment
+    if substr_start - left_dels < 0:
+        # N terminus of protein is shorter than the HMM model
+        # shift tag coordinates appropriately
+        left_shift = substr_start - left_dels
+        extended_alignment = protein_seq[:substr_start] + dels_free_alignment
+        shifted_parts = [[x + left_shift for x in part] for part in parts]
+        parts = shifted_parts
+    else:
+        extended_alignment = protein_seq[substr_start - left_dels:substr_start] + dels_free_alignment
     ext_start = substr_start + len(dels_free_alignment)
     ext_end = substr_start + len(dels_free_alignment) + right_dels
     # extend right part
@@ -210,6 +217,7 @@ def get_crtag(alignment, crtag_coordinates, protein_seq, left_dels=0, right_dels
         else:
             return TAG_INDEL
     return cr_tag
+
 
 @decorate_exceptions
 def tf_classify(**kwargs):
